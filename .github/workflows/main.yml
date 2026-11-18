@@ -1,0 +1,48 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ekstrak proyek dari source.zip
+        run: |
+          unzip -q source.zip -d work
+          ls work/SnapDL
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build debug APK
+        working-directory: work/SnapDL
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon --console=plain -Pandroid.suppressUnsupportedCompileSdk=35 2>&1 | tee build.log
+
+      - name: Rangkum penyebab gagal
+        if: failure()
+        working-directory: work/SnapDL
+        run: |
+          {
+            echo '## Penyebab gagal'
+            echo '```'
+            grep -nE "^e: |What went wrong|Execution failed|Could not |FAILURE" -A6 build.log | head -90
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nextube-debug-apk
+          path: work/SnapDL/app/build/outputs/apk/debug/*.apk
